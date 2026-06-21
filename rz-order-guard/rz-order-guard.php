@@ -9,11 +9,12 @@
  * PHASE 1+2 of this plugin: DB schema + combined fraud-check logic +
  * settings page + courier integration (Pathao/Steadfast/RedX outbound
  * booking, status refresh, and webhook receivers with the order-status
- * transition fix the old plugin was missing).
+ * transition fix the old plugin was missing). PHASE 3: order intake REST
+ * endpoint (fraud check -> WC_Order, with blocked attempts captured as leads).
  * NOT YET BUILT (next phases):
- *   - Order intake REST endpoint (receives landing-page form, runs fraud check, creates WC_Order)
  *   - Lead capture AJAX (#dp-order-now style, input/change capture, no submit needed)
  *   - Server-side CAPI sender (plain wp_remote_post, no Facebook SDK)
+ *   - Manual-review admin list for leads/blocklist
  */
 
 defined('ABSPATH') || exit;
@@ -28,6 +29,8 @@ require_once RZOG_PATH . 'includes/class-license.php';
 require_once RZOG_PATH . 'includes/class-fraud-check.php';
 require_once RZOG_PATH . 'includes/class-status-bridge.php';
 require_once RZOG_PATH . 'includes/class-admin-settings.php';
+require_once RZOG_PATH . 'includes/class-leads.php';
+require_once RZOG_PATH . 'includes/class-order-intake.php';
 require_once RZOG_PATH . 'includes/CourierIntegration/Manager.php';
 require_once RZOG_PATH . 'includes/CourierIntegration/PathaoClient.php';
 require_once RZOG_PATH . 'includes/CourierIntegration/SteadfastClient.php';
@@ -56,4 +59,5 @@ add_action('plugins_loaded', function () {
     (new RZOG\Webhooks\PathaoWebhook())->register();
     (new RZOG\Webhooks\SteadfastWebhook())->register();
     (new RZOG\Webhooks\RedXWebhook())->register();
+    (new RZOG\Order_Intake())->register();
 });
