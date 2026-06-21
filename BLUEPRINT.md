@@ -19,6 +19,7 @@ See CLAUDE.md "What's already built." In short: fraud-check core, courier integr
 - **Action hooks fire correctly, always.** See CLAUDE.md hard rule #4. This was the single biggest class of bug found in the source plugins — order-status-dependent features silently doing nothing because the order was created/transitioned through a path that never fired the expected hook.
 - **Settings-driven, not hardcoded.** No product names, no specific thresholds, no specific domain baked into core logic. Domain binding only exists in the license check (by design — that's its job).
 - **Readable over clever.** This will be read and maintained by a non-professional-developer business owner. Prefer explicit code over abstraction layers that require tracing through multiple files to understand a single operation.
+- **Data durability.** `rzog_leads`, `rzog_blocklist`, and order data are explicitly meant for future business analysis/scaling, not disposable logs. Plugin deactivation must **never** delete these tables or their rows — `register_deactivation_hook` (if one is ever added) may only unregister hooks/cron, never touch data. Schema changes must be additive (new columns/tables), never a drop-and-recreate. Any feature that deletes rows (e.g. the 4.2 retention cleanup) must be opt-in, threshold-configurable via settings, and scoped to specific statuses — never a blanket wipe. If a genuinely destructive migration is ever unavoidable, it must ship with an export path (CSV dump of the affected table) run first.
 
 ## 4. Feature Spec
 
@@ -40,6 +41,10 @@ Required behavior, in order:
 9. Reconcile: if a `rzog_leads` row exists for this session/phone, mark it `status = 'converted'` with the new `order_id`.
 10. Return the order ID/thank-you info to the frontend (for any client-side browser-pixel Purchase fire, dedup'd against the server event via the shared `event_id` from 4.3).
 
+Additional requirements (apply to the existing implementation, not deferred):
+- **Rate-limiting by IP.** This is a public, unauthenticated, order-creating endpoint — it needs its own throttle independent of the fraud check (fraud check answers "is this phone trustworthy", not "is this client flooding us"). Cap requests per IP per time window; respond `429` once exceeded.
+- **Idempotency via `session_id`.** A double-click submit or a client-side retry-on-timeout must not create two orders. Store the frontend-generated `session_id` (same one used in 4.2) as order meta on creation; if a request arrives with a `session_id` that already has an order, return that existing order's info instead of creating a duplicate. No-op (skip the check) when `session_id` is absent.
+
 ### 4.2 Lead Capture (NEW — build this)
 
 Goal: capture partial form data the moment the customer types, no submit required, for the manual-call workflow in 4.4.
@@ -51,6 +56,9 @@ Required:
 - AJAX action (`wp_ajax_rzog_save_lead` / `wp_ajax_nopriv_rzog_save_lead`) writing to `rzog_leads` (insert or update by `session_id`, same as the reference's upsert pattern).
 - Minimum-meaningful-data gate before sending (phone ≥6 digits, or valid email, or name ≥3 chars, or address ≥3 chars) — don't write empty/garbage rows.
 - Standard field names in the actual order form HTML should be WooCommerce-convention (`billing_first_name`, `billing_phone`, `billing_address_1`, etc.) for maximum compatibility with this and any future hook-based plugin.
+- **Nonce verification** on the AJAX action via `check_ajax_referer()`, matching the reference plugin's pattern — this is a state-changing write endpoint, not a read.
+- **Server-side rate-limiting**, independent of the client-side debounce (the reference JS debounces 900ms before sending, but that's bypassable by calling `admin-ajax.php` directly — the throttle has to live on the server, not just in the JS).
+- **Scheduled cleanup via WP-Cron** (daily): mark `new` leads older than N minutes as `abandoned`; optionally delete `abandoned`/`rejected` leads older than a configurable retention period. Both the "mark abandoned after" minutes and the "delete after" retention period must be settings fields (not hardcoded) — and per the data-durability principle in section 3, deletion must default to off / a long retention unless the business owner explicitly configures it shorter.
 
 ### 4.3 Pixel / CAPI (NEW — build this)
 
@@ -61,6 +69,9 @@ Required:
 - On order creation (4.1 step 7): capture `_fbp`/`_fbc` cookies and a generated `event_id` into order meta — same data old plugin captured via `woocommerce_checkout_create_order`, just without the SDK.
 - On order status → `processing`/`completed`, and on `woocommerce_thankyou`: send one Purchase event via plain `wp_remote_post` to `https://graph.facebook.com/v{API_VERSION}/{pixel_id}/events`, with hashed `em`/`ph` (SHA-256, lowercased/trimmed per Meta's spec), `client_ip_address`, `client_user_agent`, `fbp`, `fbc`, `event_id` (for browser-pixel dedup), `value`, `currency`, `content_ids`. Guard with a per-order "already sent" meta flag so the three trigger points don't send three times.
 - A simple way to verify: log the request/response when `WP_DEBUG` is on, and tell the user to check Meta Events Manager's Test Events tab for live verification — do not claim this "works" without that live check (CLAUDE.md verification expectations).
+- **Phone hashing for CAPI needs the `880...` country-code format**, which is DIFFERENT from `Fraud_Check::normalize_phone()`'s local `01...` format used for courier/fraud matching. Add a separate normalization function for CAPI specifically (e.g. `to_capi_phone_format()`) — do not reuse `normalize_phone()` for both purposes, they have opposite target formats.
+- **Log failed CAPI sends visibly** — order meta (e.g. `_rzog_capi_last_error`) plus an admin notice or a simple failures list. Do not swallow `wp_remote_post` errors or non-200 responses silently.
+- **Store the CAPI access token via `Encryption::encrypt`**, same pattern as the courier credentials in `class-admin-settings.php` (`maybe_encrypt` sanitize callback on save, `Encryption::read_option` / `display_value` on render).
 
 ### 4.4 Manual-Review Admin UI (NEW — build this)
 
@@ -71,6 +82,7 @@ Required, on a simple admin list page (could be a tab on the existing settings p
 - Status field editable inline or via quick-action buttons: `new` → `called` → `confirmed` / `rejected`. (Add `called`/`confirmed`/`rejected` as valid status values alongside the existing `new`/`converted`/`abandoned`/`blocked`.)
 - Sortable/filterable by status at minimum (so "show me everything still `new`" is one click).
 - No SMS, no automated outreach — confirmed manual-only.
+- **Gate the page behind `current_user_can('manage_options')`**, same as the settings page (CLAUDE.md rule 7 — this applies to the *capability check*, not the license gate; the license gate still only applies to functional/external hooks, not admin screens).
 
 ## 5. Non-functional Requirements
 

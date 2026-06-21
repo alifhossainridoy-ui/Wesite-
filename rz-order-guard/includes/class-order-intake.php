@@ -15,6 +15,14 @@ class Order_Intake {
 
     const BD_PHONE_REGEX = '/^01[3-9][0-9]{8}$/';
 
+    // Throttle on raw request volume, independent of Fraud_Check -- that
+    // answers "is this phone trustworthy", this answers "is this client
+    // flooding the endpoint". Plain transient counter, no DB schema needed.
+    const RATE_LIMIT_MAX    = 8;  // requests
+    const RATE_LIMIT_WINDOW = 60; // seconds
+
+    const SESSION_META_KEY = '_rzog_session_id';
+
     public function register(): void {
         add_action('rest_api_init', [$this, 'register_routes']);
     }
@@ -28,6 +36,10 @@ class Order_Intake {
     }
 
     public function handle(\WP_REST_Request $request) {
+        if ($this->is_rate_limited()) {
+            return $this->response(['errors' => ['general' => 'Too many requests. Please try again shortly.']], 429);
+        }
+
         $input = $this->collect_input($request);
 
         $errors = $this->validate($input);
@@ -38,6 +50,19 @@ class Order_Intake {
         $input['phone'] = Fraud_Check::normalize_phone($input['phone']);
         if (!preg_match(self::BD_PHONE_REGEX, $input['phone'])) {
             return $this->response(['errors' => ['billing_phone' => 'Enter a valid Bangladeshi mobile number.']], 422);
+        }
+
+        if ($input['session_id'] !== '') {
+            $existing_order = $this->find_order_by_session($input['session_id']);
+            if ($existing_order) {
+                return $this->response([
+                    'order_id'   => $existing_order->get_id(),
+                    'order_key'  => $existing_order->get_order_key(),
+                    'total'      => $existing_order->get_total(),
+                    'currency'   => $existing_order->get_currency(),
+                    'idempotent' => true,
+                ], 200);
+            }
         }
 
         $product = $this->resolve_product($input);
@@ -169,6 +194,45 @@ class Order_Intake {
         return isset($_SERVER['REMOTE_ADDR']) ? sanitize_text_field(wp_unslash($_SERVER['REMOTE_ADDR'])) : '';
     }
 
+    /**
+     * Per-IP request throttle, independent of Fraud_Check. A transient
+     * counter is enough here -- no need for a DB table for something this
+     * disposable, and it self-clears via the transient's own expiry.
+     */
+    private function is_rate_limited(): bool {
+        $ip = $this->client_ip();
+        if ($ip === '') {
+            return false; // can't throttle what we can't identify
+        }
+
+        $key   = 'rzog_intake_rl_' . md5($ip);
+        $count = (int) get_transient($key);
+
+        if ($count >= self::RATE_LIMIT_MAX) {
+            return true;
+        }
+
+        set_transient($key, $count + 1, self::RATE_LIMIT_WINDOW);
+        return false;
+    }
+
+    /**
+     * Idempotency: if this session_id already produced an order (double
+     * submit, client-side retry-on-timeout), return that order instead of
+     * creating a duplicate.
+     */
+    private function find_order_by_session(string $session_id): ?\WC_Order {
+        $orders = wc_get_orders([
+            'meta_key'   => self::SESSION_META_KEY,
+            'meta_value' => $session_id,
+            'limit'      => 1,
+            'orderby'    => 'date',
+            'order'      => 'DESC',
+        ]);
+
+        return $orders[0] ?? null;
+    }
+
     private function is_blocklisted(string $phone): bool {
         global $wpdb;
         $table = DB::table('blocklist');
@@ -242,6 +306,9 @@ class Order_Intake {
 
         $order = new \WC_Order();
         $order->set_created_via('rzog_order_intake');
+        if ($input['session_id'] !== '') {
+            $order->update_meta_data(self::SESSION_META_KEY, $input['session_id']);
+        }
         $order->set_address($address, 'billing');
         $order->set_address($address, 'shipping'); // shipping = billing, no separate address in this funnel
         $order->add_product($product, $input['quantity']);
