@@ -24,6 +24,10 @@ class Admin_Settings {
         register_setting('rzog_settings', 'rzog_contact_phone');
         register_setting('rzog_settings', 'rzog_contact_messenger');
 
+        // Lead capture cleanup thresholds (BLUEPRINT.md 4.2)
+        register_setting('rzog_settings', 'rzog_lead_abandoned_minutes');
+        register_setting('rzog_settings', 'rzog_lead_retention_days');
+
         // Steadfast
         register_setting('rzog_settings', 'rzog_ci_steadfast_enabled');
         register_setting('rzog_settings', 'rzog_ci_steadfast_api_key', ['sanitize_callback' => [$this, 'maybe_encrypt']]);
@@ -117,6 +121,21 @@ class Admin_Settings {
                     <tr>
                         <th><label for="rzog_contact_messenger">Messenger link (blocked-order contact)</label></th>
                         <td><input type="text" id="rzog_contact_messenger" name="rzog_contact_messenger" value="<?php echo esc_attr(get_option('rzog_contact_messenger')); ?>" class="regular-text"></td>
+                    </tr>
+                </table>
+
+                <h2>Lead Capture</h2>
+                <table class="form-table">
+                    <tr>
+                        <th><label for="rzog_lead_abandoned_minutes">Mark 'new' leads abandoned after (minutes)</label></th>
+                        <td><input type="number" id="rzog_lead_abandoned_minutes" name="rzog_lead_abandoned_minutes" value="<?php echo esc_attr(get_option('rzog_lead_abandoned_minutes', 30)); ?>" min="1"></td>
+                    </tr>
+                    <tr>
+                        <th><label for="rzog_lead_retention_days">Delete abandoned/rejected leads after (days)</label></th>
+                        <td>
+                            <input type="number" id="rzog_lead_retention_days" name="rzog_lead_retention_days" value="<?php echo esc_attr(get_option('rzog_lead_retention_days', 0)); ?>" min="0">
+                            <p class="description">0 = never delete (default). Leads are business data, kept for analysis -- only set this if you're sure you want old rows purged.</p>
+                        </td>
                     </tr>
                 </table>
 

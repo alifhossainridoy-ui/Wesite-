@@ -11,8 +11,9 @@
  * booking, status refresh, and webhook receivers with the order-status
  * transition fix the old plugin was missing). PHASE 3: order intake REST
  * endpoint (fraud check -> WC_Order, with blocked attempts captured as leads).
+ * PHASE 4: lead capture AJAX (#dp-order-now style, input/change capture,
+ * no submit needed) + daily WP-Cron cleanup of stale leads.
  * NOT YET BUILT (next phases):
- *   - Lead capture AJAX (#dp-order-now style, input/change capture, no submit needed)
  *   - Server-side CAPI sender (plain wp_remote_post, no Facebook SDK)
  *   - Manual-review admin list for leads/blocklist
  */
@@ -31,6 +32,7 @@ require_once RZOG_PATH . 'includes/class-status-bridge.php';
 require_once RZOG_PATH . 'includes/class-admin-settings.php';
 require_once RZOG_PATH . 'includes/class-leads.php';
 require_once RZOG_PATH . 'includes/class-order-intake.php';
+require_once RZOG_PATH . 'includes/class-lead-capture.php';
 require_once RZOG_PATH . 'includes/CourierIntegration/Manager.php';
 require_once RZOG_PATH . 'includes/CourierIntegration/PathaoClient.php';
 require_once RZOG_PATH . 'includes/CourierIntegration/SteadfastClient.php';
@@ -40,6 +42,8 @@ require_once RZOG_PATH . 'includes/Webhooks/SteadfastWebhook.php';
 require_once RZOG_PATH . 'includes/Webhooks/RedXWebhook.php';
 
 register_activation_hook(__FILE__, ['RZOG\\DB', 'install']);
+// Deactivation only ever unregisters cron -- never touches rzog_leads/blocklist data (BLUEPRINT.md section 3).
+register_deactivation_hook(__FILE__, ['RZOG\\Lead_Capture', 'deactivate']);
 
 add_action('plugins_loaded', function () {
     // Settings page always loads -- you need it to enter/see the license key.
@@ -60,4 +64,5 @@ add_action('plugins_loaded', function () {
     (new RZOG\Webhooks\SteadfastWebhook())->register();
     (new RZOG\Webhooks\RedXWebhook())->register();
     (new RZOG\Order_Intake())->register();
+    (new RZOG\Lead_Capture())->register();
 });
