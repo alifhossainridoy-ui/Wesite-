@@ -13,14 +13,16 @@
  * endpoint (fraud check -> WC_Order, with blocked attempts captured as leads).
  * PHASE 4: lead capture AJAX (#dp-order-now style, input/change capture,
  * no submit needed) + daily WP-Cron cleanup of stale leads.
- * NOT YET BUILT (next phases):
- *   - Server-side CAPI sender (plain wp_remote_post, no Facebook SDK)
+ * PHASE 5: server-side CAPI Purchase event sender (plain wp_remote_post,
+ * no Facebook SDK) -- fbp/fbc/event_id/IP/UA captured at order-creation
+ * time, sent on processing/completed/thankyou, deduped per order.
+ * NOT YET BUILT (next phase):
  *   - Manual-review admin list for leads/blocklist
  */
 
 defined('ABSPATH') || exit;
 
-define('RZOG_VERSION', '0.3.0');
+define('RZOG_VERSION', '0.4.0');
 define('RZOG_PATH', plugin_dir_path(__FILE__));
 define('RZOG_URL', plugin_dir_url(__FILE__));
 
@@ -33,6 +35,7 @@ require_once RZOG_PATH . 'includes/class-admin-settings.php';
 require_once RZOG_PATH . 'includes/class-leads.php';
 require_once RZOG_PATH . 'includes/class-order-intake.php';
 require_once RZOG_PATH . 'includes/class-lead-capture.php';
+require_once RZOG_PATH . 'includes/class-capi.php';
 require_once RZOG_PATH . 'includes/CourierIntegration/Manager.php';
 require_once RZOG_PATH . 'includes/CourierIntegration/PathaoClient.php';
 require_once RZOG_PATH . 'includes/CourierIntegration/SteadfastClient.php';
@@ -65,4 +68,5 @@ add_action('plugins_loaded', function () {
     (new RZOG\Webhooks\RedXWebhook())->register();
     (new RZOG\Order_Intake())->register();
     (new RZOG\Lead_Capture())->register();
+    (new RZOG\CAPI())->register();
 });

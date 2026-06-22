@@ -28,6 +28,10 @@ class Admin_Settings {
         register_setting('rzog_settings', 'rzog_lead_abandoned_minutes');
         register_setting('rzog_settings', 'rzog_lead_retention_days');
 
+        // Pixel / CAPI (BLUEPRINT.md 4.3)
+        register_setting('rzog_settings', 'rzog_capi_pixel_id');
+        register_setting('rzog_settings', 'rzog_capi_access_token', ['sanitize_callback' => [$this, 'maybe_encrypt']]);
+
         // Steadfast
         register_setting('rzog_settings', 'rzog_ci_steadfast_enabled');
         register_setting('rzog_settings', 'rzog_ci_steadfast_api_key', ['sanitize_callback' => [$this, 'maybe_encrypt']]);
@@ -135,6 +139,21 @@ class Admin_Settings {
                         <td>
                             <input type="number" id="rzog_lead_retention_days" name="rzog_lead_retention_days" value="<?php echo esc_attr(get_option('rzog_lead_retention_days', 0)); ?>" min="0">
                             <p class="description">0 = never delete (default). Leads are business data, kept for analysis -- only set this if you're sure you want old rows purged.</p>
+                        </td>
+                    </tr>
+                </table>
+
+                <h2>Pixel / Conversions API</h2>
+                <table class="form-table">
+                    <tr>
+                        <th><label for="rzog_capi_pixel_id">Pixel ID</label></th>
+                        <td><input type="text" id="rzog_capi_pixel_id" name="rzog_capi_pixel_id" value="<?php echo esc_attr(get_option('rzog_capi_pixel_id')); ?>" class="regular-text"></td>
+                    </tr>
+                    <tr>
+                        <th><label for="rzog_capi_access_token">CAPI Access Token</label></th>
+                        <td>
+                            <input type="text" id="rzog_capi_access_token" name="rzog_capi_access_token" value="<?php echo esc_attr($this->display_value('rzog_capi_access_token')); ?>" class="regular-text">
+                            <p class="description">System User access token from Meta Business Manager (Events Manager &rarr; this pixel &rarr; Settings &rarr; Conversions API). Single site for now -- if RupZone and RupLota ever share this codebase, this needs to become per-domain.</p>
                         </td>
                     </tr>
                 </table>
