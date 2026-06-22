@@ -97,6 +97,29 @@ class Leads {
         return 0;
     }
 
+    /**
+     * Manual-review status transition (BLUEPRINT.md 4.4): new -> called ->
+     * confirmed/rejected, driven by quick-action buttons on the leads admin
+     * list. Rejects anything outside VALID_STATUSES.
+     */
+    public static function update_status(int $id, string $status): bool {
+        if (!in_array($status, self::VALID_STATUSES, true)) {
+            return false;
+        }
+
+        global $wpdb;
+        $table   = DB::table('leads');
+        $updated = $wpdb->update(
+            $table,
+            ['status' => $status, 'updated_at' => current_time('mysql', true)],
+            ['id' => $id],
+            ['%s', '%s'],
+            ['%d']
+        );
+
+        return $updated !== false;
+    }
+
     public static function mark_converted(int $lead_id, int $order_id): void {
         global $wpdb;
         $table = DB::table('leads');
