@@ -192,7 +192,7 @@ class Leads_List_Table extends \WP_List_Table {
                 ],
                 admin_url('admin-post.php')
             ),
-            Leads_Admin::NONCE_ACTION_PREFIX . $id
+            Leads_Admin::nonce_action($id, $new_status)
         );
         return sprintf('<a href="%s" class="button button-small">%s</a>', esc_url($url), esc_html($label));
     }

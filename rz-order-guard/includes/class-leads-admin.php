@@ -15,6 +15,16 @@ class Leads_Admin {
 
     const NONCE_ACTION_PREFIX = 'rzog_update_lead_status_';
 
+    /**
+     * Binds the nonce to BOTH lead_id and new_status, not just lead_id --
+     * otherwise a valid nonce for one status change on a given lead could
+     * be replayed against that same lead with a different new_status in
+     * the URL.
+     */
+    public static function nonce_action(int $lead_id, string $new_status): string {
+        return self::NONCE_ACTION_PREFIX . $lead_id . '_' . $new_status;
+    }
+
     public function register(): void {
         add_action('admin_menu', [$this, 'add_menu']);
         add_action('admin_post_rzog_update_lead_status', [$this, 'handle_status_update']);
@@ -69,7 +79,7 @@ class Leads_Admin {
         $lead_id    = isset($_GET['lead_id']) ? absint($_GET['lead_id']) : 0;
         $new_status = isset($_GET['new_status']) ? sanitize_key($_GET['new_status']) : '';
 
-        check_admin_referer(self::NONCE_ACTION_PREFIX . $lead_id);
+        check_admin_referer(self::nonce_action($lead_id, $new_status));
 
         if ($lead_id && in_array($new_status, Leads::VALID_STATUSES, true)) {
             Leads::update_status($lead_id, $new_status);
