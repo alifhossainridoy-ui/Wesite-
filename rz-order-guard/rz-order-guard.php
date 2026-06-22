@@ -16,13 +16,14 @@
  * PHASE 5: server-side CAPI Purchase event sender (plain wp_remote_post,
  * no Facebook SDK) -- fbp/fbc/event_id/IP/UA captured at order-creation
  * time, sent on processing/completed/thankyou, deduped per order.
- * NOT YET BUILT (next phase):
- *   - Manual-review admin list for leads/blocklist
+ * PHASE 6: manual-review admin list for rzog_leads (paginated, sortable,
+ * filterable by status, tel: links, new -> called -> confirmed/rejected
+ * quick-action buttons). No automated outreach -- manual-call only.
  */
 
 defined('ABSPATH') || exit;
 
-define('RZOG_VERSION', '0.4.0');
+define('RZOG_VERSION', '0.5.0');
 define('RZOG_PATH', plugin_dir_path(__FILE__));
 define('RZOG_URL', plugin_dir_url(__FILE__));
 
@@ -33,6 +34,7 @@ require_once RZOG_PATH . 'includes/class-fraud-check.php';
 require_once RZOG_PATH . 'includes/class-status-bridge.php';
 require_once RZOG_PATH . 'includes/class-admin-settings.php';
 require_once RZOG_PATH . 'includes/class-leads.php';
+require_once RZOG_PATH . 'includes/class-leads-admin.php';
 require_once RZOG_PATH . 'includes/class-order-intake.php';
 require_once RZOG_PATH . 'includes/class-lead-capture.php';
 require_once RZOG_PATH . 'includes/class-capi.php';
@@ -51,6 +53,10 @@ register_deactivation_hook(__FILE__, ['RZOG\\Lead_Capture', 'deactivate']);
 add_action('plugins_loaded', function () {
     // Settings page always loads -- you need it to enter/see the license key.
     (new RZOG\Admin_Settings())->register();
+
+    // Leads admin list always loads too -- it only manages data already
+    // collected, same as the settings screen (CLAUDE.md rule 7).
+    (new RZOG\Leads_Admin())->register();
 
     // Everything functional is gated behind a valid, domain-matched license.
     if (!RZOG\License::is_valid()) {
