@@ -126,6 +126,18 @@ class CAPI {
             return;
         }
 
+        // woocommerce_thankyou fires on every order-received page view
+        // regardless of the order's current status (e.g. a since-cancelled
+        // order), so unlike the two status-transition hooks this needs an
+        // explicit check here -- a Purchase event must not go out for an
+        // order that isn't actually a completed purchase.
+        if (!in_array($order->get_status(), ['processing', 'completed'], true)) {
+            return;
+        }
+        if ($order->get_total() <= 0 || $order->get_item_count() < 1) {
+            return;
+        }
+
         $pixel_id     = (string) get_option('rzog_capi_pixel_id', '');
         $access_token = Encryption::read_option('rzog_capi_access_token');
         if ($pixel_id === '' || $access_token === '') {
