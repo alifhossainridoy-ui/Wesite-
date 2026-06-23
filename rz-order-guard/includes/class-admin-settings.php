@@ -31,6 +31,9 @@ class Admin_Settings {
         // Pixel / CAPI (BLUEPRINT.md 4.3)
         register_setting('rzog_settings', 'rzog_capi_pixel_id');
         register_setting('rzog_settings', 'rzog_capi_access_token', ['sanitize_callback' => [$this, 'maybe_encrypt']]);
+        // Off by default -- flips on for the cutover moment when devpsoft's
+        // browser pixel is switched off, never both at once (CLAUDE.md 4.3 addendum).
+        register_setting('rzog_settings', 'rzog_capi_browser_pixel_enabled');
 
         // Steadfast
         register_setting('rzog_settings', 'rzog_ci_steadfast_enabled');
@@ -154,6 +157,16 @@ class Admin_Settings {
                         <td>
                             <input type="text" id="rzog_capi_access_token" name="rzog_capi_access_token" value="<?php echo esc_attr($this->display_value('rzog_capi_access_token')); ?>" class="regular-text">
                             <p class="description">System User access token from Meta Business Manager (Events Manager &rarr; this pixel &rarr; Settings &rarr; Conversions API). Single site for now -- if RupZone and RupLota ever share this codebase, this needs to become per-domain.</p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th><label for="rzog_capi_browser_pixel_enabled">Browser Purchase pixel</label></th>
+                        <td>
+                            <select id="rzog_capi_browser_pixel_enabled" name="rzog_capi_browser_pixel_enabled">
+                                <option value="no" <?php selected(get_option('rzog_capi_browser_pixel_enabled', 'no'), 'no'); ?>>No</option>
+                                <option value="yes" <?php selected(get_option('rzog_capi_browser_pixel_enabled', 'no'), 'yes'); ?>>Yes</option>
+                            </select>
+                            <p class="description">Leave <strong>No</strong> until cutover day. Turning this on makes the thank-you page fire <code>fbq('track','Purchase', ...)</code> itself. If devpsoft's browser pixel is still active when this is also on, Meta will see two non-deduped Purchase events (different event IDs) -- switch devpsoft's pixel off in the same moment this is switched to Yes, never run both.</p>
                         </td>
                     </tr>
                 </table>

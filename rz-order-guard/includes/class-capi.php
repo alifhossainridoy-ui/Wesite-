@@ -26,6 +26,7 @@ class CAPI {
     const META_CLIENT_IP    = '_rzog_capi_client_ip';
     const META_CLIENT_UA    = '_rzog_capi_client_ua';
     const META_SENT         = '_rzog_capi_sent';
+    const META_BROWSER_SENT = '_rzog_capi_browser_sent';
     const META_LAST_ERROR   = '_rzog_capi_last_error';
 
     public function register(): void {
@@ -88,16 +89,23 @@ class CAPI {
     }
 
     /**
-     * This plugin doesn't own the base browser pixel code (theme snippet,
-     * GTM, etc., set up separately) -- but for that code's Purchase call to
-     * dedup against this class's server-side CAPI Purchase event, it needs
-     * the SAME event_id. Exposing it here means whatever fires the browser
-     * pixel just has to read window.RZOG.purchaseEventId instead of
-     * generating its own.
+     * Exposes this order's Purchase event_id as window.RZOG.purchaseEventId,
+     * then -- only if rzog_capi_browser_pixel_enabled is "yes" -- fires the
+     * actual browser-side fbq('track','Purchase', ...) call ourselves, using
+     * that same event_id, so we don't depend on devpsoft's (or any other)
+     * pixel snippet at all. The setting defaults to "no": running this
+     * alongside devpsoft's still-active browser pixel would double-count
+     * Purchases in Meta (two different event IDs, neither deduped against
+     * the other) -- only flip it to "yes" in the same moment devpsoft's
+     * pixel is switched off (cutover).
      */
     public function output_browser_pixel_event_id($order_id): void {
         $order = wc_get_order($order_id);
         if (!$order instanceof \WC_Order) {
+            return;
+        }
+
+        if (!$this->passes_validity_guard($order)) {
             return;
         }
 
@@ -110,11 +118,80 @@ class CAPI {
             '<script>window.RZOG = window.RZOG || {}; window.RZOG.purchaseEventId = %s;</script>' . "\n",
             wp_json_encode($event_id)
         );
+
+        $this->output_browser_purchase_pixel($order, $event_id);
+    }
+
+    /**
+     * OFF by default -- see the doc comment on output_browser_pixel_event_id().
+     * Guarded a second time here (own META_BROWSER_SENT flag, separate from
+     * the server-side META_SENT) because woocommerce_thankyou fires on every
+     * order-received page view: a customer reloading or revisiting that URL
+     * must not refire the browser-side Purchase a second time.
+     *
+     * Detecting whether a pixel script is already on the page is done
+     * client-side (typeof window.fbq !== 'function'), not server-side --
+     * this plugin can't know what a theme/GTM/other plugin injected. If
+     * window.fbq already exists we skip loading fbevents.js and skip
+     * re-init, and just call the existing fbq() to track Purchase; this
+     * assumes the already-loaded pixel matches rzog_capi_pixel_id, which
+     * holds for this single-pixel, single-business setup (CLAUDE.md scope).
+     */
+    private function output_browser_purchase_pixel(\WC_Order $order, string $event_id): void {
+        if (get_option('rzog_capi_browser_pixel_enabled', 'no') !== 'yes') {
+            return;
+        }
+        if ($order->get_meta(self::META_BROWSER_SENT) === '1') {
+            return;
+        }
+
+        $pixel_id = (string) get_option('rzog_capi_pixel_id', '');
+        if ($pixel_id === '') {
+            return;
+        }
+
+        $value    = (float) $order->get_total();
+        $currency = $order->get_currency();
+        ?>
+        <script>
+        (function () {
+          if (typeof window.fbq !== 'function') {
+            !function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+            n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;
+            n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;
+            t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,
+            document,'script','https://connect.facebook.net/en_US/fbevents.js');
+            window.fbq('init', <?php echo wp_json_encode($pixel_id); ?>);
+          }
+          window.fbq('track', 'Purchase', {
+            value: <?php echo wp_json_encode($value); ?>,
+            currency: <?php echo wp_json_encode($currency); ?>
+          }, { eventID: <?php echo wp_json_encode($event_id); ?> });
+        })();
+        </script>
+        <?php
+
+        $order->update_meta_data(self::META_BROWSER_SENT, '1');
+        $order->save();
     }
 
     /** Single source of truth for this order's Purchase event_id -- used by both the CAPI send and the browser-pixel exposure above. */
     public static function get_event_id(\WC_Order $order): string {
         return (string) $order->get_meta(self::META_EVENT_ID);
+    }
+
+    /**
+     * woocommerce_thankyou fires on every order-received page view
+     * regardless of the order's current status (e.g. a since-cancelled
+     * order) -- both the server CAPI send and the browser-side pixel fire
+     * share this same guard so neither sends a Purchase event for an order
+     * that isn't actually a completed purchase.
+     */
+    private function passes_validity_guard(\WC_Order $order): bool {
+        if (!in_array($order->get_status(), ['processing', 'completed'], true)) {
+            return false;
+        }
+        return $order->get_total() > 0 && $order->get_item_count() >= 1;
     }
 
     /**
@@ -126,15 +203,7 @@ class CAPI {
             return;
         }
 
-        // woocommerce_thankyou fires on every order-received page view
-        // regardless of the order's current status (e.g. a since-cancelled
-        // order), so unlike the two status-transition hooks this needs an
-        // explicit check here -- a Purchase event must not go out for an
-        // order that isn't actually a completed purchase.
-        if (!in_array($order->get_status(), ['processing', 'completed'], true)) {
-            return;
-        }
-        if ($order->get_total() <= 0 || $order->get_item_count() < 1) {
+        if (!$this->passes_validity_guard($order)) {
             return;
         }
 
