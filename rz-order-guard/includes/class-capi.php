@@ -196,17 +196,31 @@ class CAPI {
      * and a runtime re-check (output_browser_purchase_pixel() above) so this
      * doesn't depend on remembering to flip both switches in the right order.
      *
-     * Returns false (not active / unknown) if devpsoft isn't installed or its
-     * helper class isn't present -- there's nothing to conflict with in that
-     * case. This can't detect a *different* unknown plugin/theme/GTM snippet
-     * also firing fbq('track','Purchase',...) independently of devpsoft; that
-     * would have to be ruled out manually before cutover.
+     * Fails closed: the only case that returns false (safe to fire) is devpsoft
+     * being confirmed absent (no DPFB_Utils class at all -- nothing to conflict
+     * with). Any genuine uncertainty -- the class exists but setting() doesn't,
+     * or the call throws for any reason -- returns true (treat as active,
+     * refuse to fire) rather than risk a double-counted Purchase. This also
+     * means a missing/changed method can never reach an uncaught fatal error
+     * on the thank-you page; the worst case is the browser pixel staying
+     * dormant.
+     *
+     * This can't detect a *different* unknown plugin/theme/GTM snippet also
+     * firing fbq('track','Purchase',...) independently of devpsoft; that would
+     * have to be ruled out manually before cutover.
      */
     public static function devpsoft_browser_pixel_active(): bool {
         if (!class_exists('\DPFB_Utils')) {
             return false;
         }
-        return (bool) \DPFB_Utils::setting('enable_browser', 1);
+        if (!method_exists('\DPFB_Utils', 'setting')) {
+            return true;
+        }
+        try {
+            return (bool) \DPFB_Utils::setting('enable_browser', 1);
+        } catch (\Throwable $e) {
+            return true;
+        }
     }
 
     /**
