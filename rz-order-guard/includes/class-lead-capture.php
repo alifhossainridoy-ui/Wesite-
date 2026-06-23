@@ -50,6 +50,7 @@ class Lead_Capture {
             'ajax_url' => admin_url('admin-ajax.php'),
             'nonce'    => wp_create_nonce(self::NONCE_ACTION),
             'marker'   => '#dp-order-now',
+            'currency' => function_exists('get_woocommerce_currency') ? get_woocommerce_currency() : '',
         ]);
     }
 

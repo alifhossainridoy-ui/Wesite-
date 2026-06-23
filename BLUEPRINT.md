@@ -84,6 +84,46 @@ Required, on a simple admin list page (could be a tab on the existing settings p
 - No SMS, no automated outreach — confirmed manual-only.
 - **Gate the page behind `current_user_can('manage_options')`**, same as the settings page (CLAUDE.md rule 7 — this applies to the *capability check*, not the license gate; the license gate still only applies to functional/external hooks, not admin screens).
 
+### 4.5 Frontend Funnel Template (NEW — build this, separate plugin)
+
+A second, small plugin — `rz-funnel-template` — separate from `rz-order-guard` (different responsibility: display, not fraud/courier/pixel logic). It consumes `rz-order-guard`'s existing contracts rather than duplicating them:
+- Order form posts to `/wp-json/rzog/v1/order` (4.1).
+- Order form wrapper carries `id="dp-order-now"` so the existing lead-capture JS (4.2) binds to it automatically — no new JS needed for that part.
+- Form fields use standard WooCommerce field names (`billing_first_name`, `billing_last_name`, `billing_phone`, `billing_address_1`) for consistency with both plugins' expectations.
+
+**What it does**: overrides WooCommerce's single-product template for every product (not per-product Elementor assignment) via `woocommerce_locate_template` or a `single-product.php` override registered from the plugin, so it applies automatically to all 10 products with zero per-product setup.
+
+**Why a custom template instead of Elementor** (decided, don't revisit): Elementor adds page weight that works against the "low load" requirement already established for this project, and the order form's REST/JS integration needs raw markup regardless of which is used — Elementor's no-code advantage doesn't apply to the most important part of the page anyway.
+
+**Page structure, top to bottom**:
+1. Hero — product gallery/images, title, price (pull from the real `WC_Product` object, not hardcoded — content stays editable via the normal product admin screen).
+2. Order form, wrapped in `id="dp-order-now"` — name, phone, address, quantity, COD-only, submit posts to the 4.1 endpoint via `fetch`.
+3. Repeated anchor CTA buttons through the page body (`<a href="#dp-order-now">...</a>`), scrolling back up to the form — exact copy is business content, not specified here.
+4. Benefit/ingredient/image sections — pull from the product's description/short description fields, so editing content never requires a code change.
+5. Cross-sell grid before the footer — WooCommerce related-products query, styled consistently, each card linking to that product's own page (which renders through this same template).
+
+**Design tokens** (best-effort reconstruction of an earlier landing page direction — Cream white + Deep Teal + Gold + Playfair Display — exact hex values were not recoverable from this session; treat as a strong starting point, adjust if the original file turns up):
+- Cream background: `#F8F4EC`
+- Deep teal (primary/headers/CTA): `#1C4A45`
+- Gold accent (sparingly, CTA highlights/dividers): `#C9A24B`
+- Warm near-black body text: `#211D17`
+
+**Typography — important constraint, do not default to Playfair Display for Bangla copy**: the actual product copy is Bengali (Bangla script). Playfair Display is Latin-only and will silently fall back to a default font for any Bangla character, breaking the intended look. Use:
+- Display/headline (Bangla): **Noto Serif Bengali** — closest elegant-serif match to the Playfair Display direction that actually renders Bangla.
+- Body (Bangla): **Hind Siliguri** or **Noto Sans Bengali** — clean, highly legible at small sizes on mobile.
+- Playfair Display itself is fine ONLY for any Latin-script brand wordmark, English logo text, or numerals — not for Bangla headline/body copy.
+
+**Performance**: lazy-load every image below the hero fold (`loading="lazy"`), no Elementor/page-builder runtime, minimal custom CSS/JS — this page will be hit by paid traffic on BD mobile networks, page weight is a conversion-rate variable, not a nice-to-have.
+
+**Structural reference**: an existing live page (tuketaky.online, old domain, same product) has a genuinely useful structure to borrow from — order form directly below the hero, repeated CTA buttons scrolling to the form, an FAQ accordion near the end, footer trust badges (COD/bKash/Nagad) + policy page links + WhatsApp contact. Use this as a structural reference only.
+
+**Explicitly do NOT carry over from that reference page** — these content patterns contradict the policy-safety decisions already established for this project, and one was already self-identified as a problem in the business owner's own past planning and never fixed:
+- Before/after photos
+- Guaranteed-result language ("7-day result guarantee" etc.)
+- Biological mechanism claims ("increases collagen/elastin production")
+- Unverified specific percentage statistics presented as fact
+- Fake scarcity counters ("only 27 left in stock") — flagged as fake in the business's own action plan previously, still live on the reference page, do not repeat it here
+
 ## 5. Non-functional Requirements
 
 - **Performance**: cache external fraud-API results (already done, `rzog_fraud_cache` table, configurable hours). Avoid N+1 queries in the admin list (4.4) — paginate.
@@ -106,5 +146,8 @@ Required, on a simple admin list page (could be a tab on the existing settings p
 - [ ] Lead capture JS fires on input without requiring submit, on a page containing `#dp-order-now`
 - [ ] CAPI Purchase event sends exactly once per order (verify via order meta flag + Meta Test Events tab)
 - [ ] Manual-review list page shows leads with working `tel:` links and status transitions
+- [ ] `rz-funnel-template` applies to all products automatically, no per-product setup
+- [ ] Order form on the template has `id="dp-order-now"` and standard WooCommerce field names, confirmed working with both the 4.1 endpoint and the 4.2 lead-capture JS on a real page (not just in isolation)
+- [ ] No Bangla text rendered in Playfair Display (or any other Latin-only font) — confirmed visually, not just by reading the CSS
 - [ ] Every new/changed file passes `php -l`
 - [ ] Nothing in the new code reintroduces obfuscation, bundled SDKs, or a missed `do_action()` for order creation/status changes
