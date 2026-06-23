@@ -144,6 +144,14 @@ class CAPI {
         if ($order->get_meta(self::META_BROWSER_SENT) === '1') {
             return;
         }
+        // Defense-in-depth: re-check devpsoft's own state at the moment of
+        // firing, not just whatever the settings flag said when last saved.
+        // Closes the race where the setting was saved 'yes' correctly (devpsoft
+        // off at the time) but devpsoft got reactivated afterwards without
+        // this setting being flipped back.
+        if (self::devpsoft_browser_pixel_active()) {
+            return;
+        }
 
         $pixel_id = (string) get_option('rzog_capi_pixel_id', '');
         if ($pixel_id === '') {
@@ -178,6 +186,27 @@ class CAPI {
     /** Single source of truth for this order's Purchase event_id -- used by both the CAPI send and the browser-pixel exposure above. */
     public static function get_event_id(\WC_Order $order): string {
         return (string) $order->get_meta(self::META_EVENT_ID);
+    }
+
+    /**
+     * Detects whether devpsoft's own browser Purchase pixel is still active,
+     * via its own exposed API (DPFB_Utils::setting('enable_browser', 1)) --
+     * found by literal evidence in reference/devpsoft-woocommerce-events-reference.php.
+     * Used both as a save-time block (Admin_Settings::sanitize_browser_pixel_enabled())
+     * and a runtime re-check (output_browser_purchase_pixel() above) so this
+     * doesn't depend on remembering to flip both switches in the right order.
+     *
+     * Returns false (not active / unknown) if devpsoft isn't installed or its
+     * helper class isn't present -- there's nothing to conflict with in that
+     * case. This can't detect a *different* unknown plugin/theme/GTM snippet
+     * also firing fbq('track','Purchase',...) independently of devpsoft; that
+     * would have to be ruled out manually before cutover.
+     */
+    public static function devpsoft_browser_pixel_active(): bool {
+        if (!class_exists('\DPFB_Utils')) {
+            return false;
+        }
+        return (bool) \DPFB_Utils::setting('enable_browser', 1);
     }
 
     /**

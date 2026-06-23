@@ -33,7 +33,10 @@ class Admin_Settings {
         register_setting('rzog_settings', 'rzog_capi_access_token', ['sanitize_callback' => [$this, 'maybe_encrypt']]);
         // Off by default -- flips on for the cutover moment when devpsoft's
         // browser pixel is switched off, never both at once (CLAUDE.md 4.3 addendum).
-        register_setting('rzog_settings', 'rzog_capi_browser_pixel_enabled');
+        // sanitize_callback blocks the save back to 'no' (with an admin error)
+        // if devpsoft's own browser pixel is still detected active -- doesn't
+        // rely on the site owner remembering to flip both switches in order.
+        register_setting('rzog_settings', 'rzog_capi_browser_pixel_enabled', ['sanitize_callback' => [$this, 'sanitize_browser_pixel_enabled']]);
 
         // Steadfast
         register_setting('rzog_settings', 'rzog_ci_steadfast_enabled');
@@ -67,6 +70,28 @@ class Admin_Settings {
         return Encryption::encrypt($value);
     }
 
+    /**
+     * Blocks turning this on while devpsoft's own browser pixel is still
+     * active -- see CAPI::devpsoft_browser_pixel_active(). Forces the value
+     * back to 'no' and surfaces an admin error instead of silently ignoring
+     * the attempted change, so the save doesn't look like it succeeded.
+     */
+    public function sanitize_browser_pixel_enabled(string $value): string {
+        $value = ($value === 'yes') ? 'yes' : 'no';
+
+        if ($value === 'yes' && CAPI::devpsoft_browser_pixel_active()) {
+            add_settings_error(
+                'rzog_capi_browser_pixel_enabled',
+                'rzog_devpsoft_conflict',
+                'Browser Purchase pixel was NOT enabled: devpsoft\'s own browser pixel (enable_browser) is still active. Switch that off first, then re-save this as Yes -- running both at once double-counts Purchase events in Meta.',
+                'error'
+            );
+            return 'no';
+        }
+
+        return $value;
+    }
+
     /** Decrypt for display in the settings form (so re-saving doesn't double-encrypt). */
     private function display_value(string $option_name): string {
         return Encryption::read_option($option_name);
@@ -80,6 +105,7 @@ class Admin_Settings {
         <div class="wrap">
             <h1>RZ Order Guard</h1>
             <p>Fraud-check core + courier integration (Pathao/Steadfast/RedX). Order intake, lead capture, and CAPI sender land in later phases.</p>
+            <?php settings_errors(); ?>
             <form method="post" action="options.php">
                 <?php settings_fields('rzog_settings'); ?>
                 <h2>License</h2>
@@ -167,6 +193,17 @@ class Admin_Settings {
                                 <option value="yes" <?php selected(get_option('rzog_capi_browser_pixel_enabled', 'no'), 'yes'); ?>>Yes</option>
                             </select>
                             <p class="description">Leave <strong>No</strong> until cutover day. Turning this on makes the thank-you page fire <code>fbq('track','Purchase', ...)</code> itself. If devpsoft's browser pixel is still active when this is also on, Meta will see two non-deduped Purchase events (different event IDs) -- switch devpsoft's pixel off in the same moment this is switched to Yes, never run both.</p>
+                            <p class="description">
+                                devpsoft browser pixel detected:
+                                <?php if (!class_exists('\DPFB_Utils')): ?>
+                                    <strong>not installed / not detected</strong>
+                                <?php elseif (CAPI::devpsoft_browser_pixel_active()): ?>
+                                    <strong style="color:#b32d2e;">ACTIVE right now</strong> -- turning the setting above to Yes will be blocked until you switch devpsoft's pixel off.
+                                <?php else: ?>
+                                    <strong style="color:#1a7a1a;">inactive</strong>
+                                <?php endif; ?>
+                                (live check, re-evaluated on every page load -- not cached)
+                            </p>
                         </td>
                     </tr>
                 </table>
