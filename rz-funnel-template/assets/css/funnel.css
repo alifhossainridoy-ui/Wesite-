@@ -1,0 +1,327 @@
+/*
+ * RZ Funnel Template -- design tokens per BLUEPRINT.md 4.5: cream/teal/gold,
+ * Noto Serif Bengali for Bangla headlines (Playfair Display is Latin-only
+ * and silently drops Bangla glyphs, so it's reserved for Latin wordmarks/
+ * numerals only), Hind Siliguri for Bangla body copy.
+ */
+
+:root {
+  --rzft-cream: #F8F4EC;
+  --rzft-teal: #1C4A45;
+  --rzft-gold: #C9A24B;
+  --rzft-text: #211D17;
+
+  --rzft-font-display: 'Noto Serif Bengali', 'Playfair Display', serif;
+  --rzft-font-body: 'Hind Siliguri', 'Noto Sans Bengali', sans-serif;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+.rzft-landing {
+  background: var(--rzft-cream);
+  color: var(--rzft-text);
+  font-family: var(--rzft-font-body);
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 0 16px 32px;
+}
+
+.rzft-landing h1,
+.rzft-landing h2 {
+  font-family: var(--rzft-font-display);
+  color: var(--rzft-teal);
+}
+
+/* Hero */
+.rzft-hero {
+  padding-top: 16px;
+}
+
+.rzft-hero__image {
+  width: 100%;
+  height: auto;
+  border-radius: 8px;
+}
+
+.rzft-hero__thumbs {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+  overflow-x: auto;
+}
+
+.rzft-hero__thumb {
+  width: 64px;
+  height: 64px;
+  object-fit: cover;
+  border-radius: 6px;
+  flex-shrink: 0;
+}
+
+.rzft-hero__title {
+  font-size: 1.5rem;
+  margin: 16px 0 4px;
+}
+
+.rzft-hero__price {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--rzft-gold);
+  margin-bottom: 16px;
+}
+
+/* CTA buttons */
+.rzft-cta {
+  display: inline-block;
+  background: var(--rzft-teal);
+  color: var(--rzft-cream);
+  font-weight: 600;
+  text-decoration: none;
+  padding: 12px 24px;
+  border-radius: 6px;
+  text-align: center;
+}
+
+.rzft-cta--ghost {
+  background: transparent;
+  color: var(--rzft-teal);
+  border: 2px solid var(--rzft-teal);
+}
+
+.rzft-cta-band {
+  text-align: center;
+  margin: 24px 0;
+}
+
+/* Order form */
+.rzft-order {
+  background: #fff;
+  border: 1px solid rgba(28, 74, 69, 0.15);
+  border-radius: 8px;
+  padding: 20px;
+  margin: 24px 0;
+}
+
+.rzft-order__title {
+  font-size: 1.1rem;
+  margin-top: 0;
+}
+
+.rzft-order__form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.rzft-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.9rem;
+}
+
+.rzft-field input[type="text"],
+.rzft-field input[type="tel"],
+.rzft-field input[type="number"],
+.rzft-field textarea {
+  font-family: inherit;
+  font-size: 1rem;
+  padding: 10px;
+  border: 1px solid rgba(28, 74, 69, 0.3);
+  border-radius: 6px;
+}
+
+.rzft-field.is-invalid input,
+.rzft-field.is-invalid textarea {
+  border-color: #b3261e;
+}
+
+.rzft-qty {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.rzft-qty__btn {
+  width: 36px;
+  height: 36px;
+  border: 1px solid rgba(28, 74, 69, 0.3);
+  background: var(--rzft-cream);
+  border-radius: 6px;
+  font-size: 1.2rem;
+  cursor: pointer;
+}
+
+#rzft-qty-input {
+  width: 60px;
+  text-align: center;
+}
+
+.rzft-order__cod {
+  font-size: 0.85rem;
+  color: var(--rzft-teal);
+}
+
+.rzft-order__submit {
+  border: none;
+  cursor: pointer;
+  font-size: 1.05rem;
+}
+
+.rzft-order__submit:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.rzft-form-message {
+  border-radius: 6px;
+  padding: 10px 14px;
+  margin-bottom: 12px;
+  font-size: 0.9rem;
+}
+
+.rzft-form-message.is-error {
+  background: #fdecea;
+  color: #b3261e;
+}
+
+.rzft-form-message.is-hidden {
+  display: none;
+}
+
+.rzft-form-message ul {
+  margin: 0;
+  padding-left: 18px;
+}
+
+/* Benefits */
+.rzft-benefits {
+  margin: 24px 0;
+  line-height: 1.7;
+}
+
+/* FAQ */
+.rzft-faq__item {
+  border-bottom: 1px solid rgba(28, 74, 69, 0.15);
+  padding: 12px 0;
+}
+
+.rzft-faq__question {
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.rzft-faq__answer {
+  margin-top: 8px;
+  color: rgba(33, 29, 23, 0.85);
+}
+
+/* Related products */
+.rzft-related__grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+.rzft-related__card {
+  display: flex;
+  flex-direction: column;
+  text-decoration: none;
+  color: var(--rzft-text);
+  background: #fff;
+  border-radius: 8px;
+  padding: 8px;
+  border: 1px solid rgba(28, 74, 69, 0.1);
+}
+
+.rzft-related__card img {
+  width: 100%;
+  height: auto;
+  border-radius: 6px;
+}
+
+.rzft-related__name {
+  font-size: 0.85rem;
+  margin-top: 6px;
+}
+
+.rzft-related__price {
+  font-size: 0.85rem;
+  color: var(--rzft-gold);
+  font-weight: 600;
+}
+
+/* Trust footer */
+.rzft-trust {
+  text-align: center;
+  padding: 24px 0;
+  border-top: 1px solid rgba(28, 74, 69, 0.15);
+  margin-top: 24px;
+}
+
+.rzft-trust__badges {
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+  font-weight: 600;
+  color: var(--rzft-teal);
+  margin-bottom: 8px;
+}
+
+.rzft-trust__contact a {
+  margin: 0 8px;
+  color: var(--rzft-teal);
+}
+
+.rzft-trust__policy {
+  display: block;
+  margin-top: 8px;
+  font-size: 0.8rem;
+  color: rgba(33, 29, 23, 0.6);
+}
+
+/* Blocked-order contact modal */
+.rzft-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(33, 29, 23, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.rzft-modal.is-hidden {
+  display: none;
+}
+
+.rzft-modal__box {
+  background: var(--rzft-cream);
+  border-radius: 8px;
+  padding: 24px;
+  max-width: 320px;
+  text-align: center;
+}
+
+.rzft-modal__links {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 16px 0;
+}
+
+.rzft-modal__links a {
+  color: var(--rzft-teal);
+  font-weight: 600;
+}
+
+.rzft-modal__close {
+  border: 1px solid var(--rzft-teal);
+  background: transparent;
+  color: var(--rzft-teal);
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+}
