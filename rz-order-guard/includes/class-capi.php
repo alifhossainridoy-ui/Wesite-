@@ -34,6 +34,7 @@ class CAPI {
         add_action('woocommerce_order_status_processing', [$this, 'maybe_send']);
         add_action('woocommerce_order_status_completed', [$this, 'maybe_send']);
         add_action('woocommerce_thankyou', [$this, 'maybe_send']);
+        add_action('woocommerce_thankyou', [$this, 'output_browser_pixel_event_id']);
 
         add_action('admin_notices', [$this, 'render_failure_notice']);
     }
@@ -84,6 +85,36 @@ class CAPI {
             return;
         }
         $this->send_event($order);
+    }
+
+    /**
+     * This plugin doesn't own the base browser pixel code (theme snippet,
+     * GTM, etc., set up separately) -- but for that code's Purchase call to
+     * dedup against this class's server-side CAPI Purchase event, it needs
+     * the SAME event_id. Exposing it here means whatever fires the browser
+     * pixel just has to read window.RZOG.purchaseEventId instead of
+     * generating its own.
+     */
+    public function output_browser_pixel_event_id($order_id): void {
+        $order = wc_get_order($order_id);
+        if (!$order instanceof \WC_Order) {
+            return;
+        }
+
+        $event_id = self::get_event_id($order);
+        if ($event_id === '') {
+            return;
+        }
+
+        printf(
+            '<script>window.RZOG = window.RZOG || {}; window.RZOG.purchaseEventId = %s;</script>' . "\n",
+            wp_json_encode($event_id)
+        );
+    }
+
+    /** Single source of truth for this order's Purchase event_id -- used by both the CAPI send and the browser-pixel exposure above. */
+    public static function get_event_id(\WC_Order $order): string {
+        return (string) $order->get_meta(self::META_EVENT_ID);
     }
 
     /**
@@ -171,7 +202,7 @@ class CAPI {
             }
         }
 
-        $event_id = (string) $order->get_meta(self::META_EVENT_ID);
+        $event_id = self::get_event_id($order);
         if ($event_id === '') {
             // Order existed before this feature shipped -- still send, just
             // without browser-pixel dedup for this one event.
