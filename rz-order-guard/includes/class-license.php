@@ -23,7 +23,7 @@ class License {
 
     // Paste the PUBLIC key printed by tools/generate-keypair.php here.
     // This value is safe to ship -- it cannot be used to forge a license.
-    const PUBLIC_KEY_B64 = 'PASTE_YOUR_PUBLIC_KEY_HERE';
+    const PUBLIC_KEY_B64 = '06sRQgHEe+7aJ7V4fBDEAfWJOgU6CO/MH4BDs0Oq0e4=';
 
     public static function is_valid(): bool {
         $payload = self::verified_payload();
